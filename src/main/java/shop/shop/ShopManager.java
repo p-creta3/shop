@@ -213,12 +213,20 @@ public class ShopManager implements Listener {
             ResultSet rs = ps.executeQuery();
 
             while (rs.next()) {
+                int itemId = rs.getInt("id");
                 String base64 = rs.getString("item_base64");
+                int stock = rs.getInt("stock");
+
                 ItemStack item = ItemSerializer.deserialize(base64);
                 if (item != null) {
-                    int stock = rs.getInt("stock");
-                    // 필요하면 stock 정보 활용
                     inv.addItem(item);
+
+                    // 재고 등록
+                    itemToStock.putIfAbsent(shopName, new HashMap<>());
+                    itemToStock.get(shopName).put(item, stock);
+
+                    // 재료 불러오기
+                    loadMaterialsForItem(itemId, item, shopName);
                 }
             }
 
@@ -229,6 +237,41 @@ public class ShopManager implements Listener {
             e.printStackTrace();
         }
     }
+
+    public static void loadMaterialsForItem(int itemId, ItemStack resultItem, String shopName) {
+        try {
+            PreparedStatement ps = MySQLManager.getConnection().prepareStatement(
+                    "SELECT material_base64, amount FROM item_materials WHERE item_id = ?"
+            );
+            ps.setInt(1, itemId);
+            ResultSet rs = ps.executeQuery();
+
+            List<ItemStack> materials = new ArrayList<>();
+
+            while (rs.next()) {
+                String matBase64 = rs.getString("material_base64");
+                int amount = rs.getInt("amount");
+
+                ItemStack mat = ItemSerializer.deserialize(matBase64);
+                if (mat != null) {
+                    mat.setAmount(amount);
+                    materials.add(mat);
+                }
+            }
+
+            rs.close();
+            ps.close();
+
+            itemToMaterials.putIfAbsent(shopName, new HashMap<>());
+            itemToMaterials.get(shopName).put(resultItem, materials);
+
+            System.out.println("[ShopPlugin] 재료 로딩 완료 (" + resultItem.getType() + ")");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     public static Integer getItemId(String shopName, ItemStack item) {
         String base64 = ItemSerializer.serialize(item);
