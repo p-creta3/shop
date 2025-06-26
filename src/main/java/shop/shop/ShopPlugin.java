@@ -39,6 +39,8 @@ public final class ShopPlugin extends JavaPlugin {
 
                 Inventory inv = Bukkit.createInventory(null, rows * 9, "§8[상점] " + name);
                 shops.put(name, inv);
+
+                ShopManager.loadShopItems(name, inv);
             }
 
             rs.close();

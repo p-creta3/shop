@@ -15,6 +15,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.ResultSet;
 import java.util.*;
 
 public class ShopManager implements Listener {
@@ -57,7 +58,7 @@ public class ShopManager implements Listener {
         shops.put(name, inv);
         player.sendMessage("§a상점 [" + name + "] 이(가) 생성되었습니다.");
 
-        // ✅ MySQL에 저장
+        // MySQL에 저장
         try {
             PreparedStatement ps = MySQLManager.getConnection().prepareStatement(
                     "INSERT INTO shops (name, shop_rows) VALUES (?, ?)"
@@ -141,6 +142,66 @@ public class ShopManager implements Listener {
         editMode.put(player.getUniqueId(), "material");
         player.openInventory(inv);
         player.sendMessage("§e아이템을 우클릭하여 재료 설정 GUI를 여세요.");
+    }
+
+    public static void saveShopItem(String shopName, ItemStack item, Integer stock) {
+        String itemBase64 = ItemSerializer.serialize(item);
+        if (itemBase64 == null) return;
+
+        try {
+            // 중복 방지 위해 기존 데이터 삭제
+            PreparedStatement deleteStmt = MySQLManager.getConnection().prepareStatement(
+                    "DELETE FROM shop_items WHERE shop_name = ? AND item_base64 = ?"
+            );
+            deleteStmt.setString(1, shopName);
+            deleteStmt.setString(2, itemBase64);
+            deleteStmt.executeUpdate();
+            deleteStmt.close();
+
+            // 새 아이템 저장
+            PreparedStatement insertStmt = MySQLManager.getConnection().prepareStatement(
+                    "INSERT INTO shop_items (shop_name, item_base64, stock) VALUES (?, ?, ?)"
+            );
+            insertStmt.setString(1, shopName);
+            insertStmt.setString(2, itemBase64);
+            if (stock != null) {
+                insertStmt.setInt(3, stock);
+            } else {
+                insertStmt.setNull(3, java.sql.Types.INTEGER);
+            }
+            insertStmt.executeUpdate();
+            insertStmt.close();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // 필요시 플레이어에게 메시지 전달 가능
+        }
+    }
+
+    public static void loadShopItems(String shopName, Inventory inv) {
+        try {
+            PreparedStatement ps = MySQLManager.getConnection().prepareStatement(
+                    "SELECT item_base64, stock FROM shop_items WHERE shop_name = ?"
+            );
+            ps.setString(1, shopName);
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                String base64 = rs.getString("item_base64");
+                ItemStack item = ItemSerializer.deserialize(base64);
+                if (item != null) {
+                    int stock = rs.getInt("stock");
+                    // 필요하면 stock 정보 활용
+                    inv.addItem(item);
+                }
+            }
+
+            rs.close();
+            ps.close();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void setStock(Player player, String[] args) {
