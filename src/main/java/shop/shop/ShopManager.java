@@ -207,7 +207,7 @@ public class ShopManager implements Listener {
     public static void loadShopItems(String shopName, Inventory inv) {
         try {
             PreparedStatement ps = MySQLManager.getConnection().prepareStatement(
-                    "SELECT item_base64, stock FROM shop_items WHERE shop_name = ?"
+                    "SELECT id, item_base64, stock FROM shop_items WHERE shop_name = ?"
             );
             ps.setString(1, shopName);
             ResultSet rs = ps.executeQuery();
