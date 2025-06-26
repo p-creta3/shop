@@ -230,6 +230,35 @@ public class ShopManager implements Listener {
         }
     }
 
+    public static Integer getItemId(String shopName, ItemStack item) {
+        String base64 = ItemSerializer.serialize(item);
+        if (base64 == null) return null;
+
+        try {
+            PreparedStatement ps = MySQLManager.getConnection().prepareStatement(
+                    "SELECT id FROM shop_items WHERE shop_name = ? AND item_base64 = ?"
+            );
+            ps.setString(1, shopName);
+            ps.setString(2, base64);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                int id = rs.getInt("id");
+                rs.close();
+                ps.close();
+                return id;
+            }
+
+            rs.close();
+            ps.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+
     public static void setStock(Player player, String[] args) {
         if (args.length < 3) {
             player.sendMessage("§c사용법: /교환상점 재고 [이름] [횟수]");
@@ -262,6 +291,44 @@ public class ShopManager implements Listener {
         itemToStock.put(name, stockMap);
         player.sendMessage("§a[" + name + "] 상점 내 아이템들의 최대 교환 횟수를 " + maxStock + "회로 설정했습니다.");
     }
+
+    public static void saveMaterialsForItem(String shopName, ItemStack resultItem, List<ItemStack> materials) {
+        Integer itemId = getItemId(shopName, resultItem);
+        if (itemId == null) {
+            System.out.println("[ShopPlugin] 저장 실패: 아이템 ID 찾을 수 없음");
+            return;
+        }
+
+        try {
+            // 기존 재료 삭제
+            PreparedStatement delete = MySQLManager.getConnection().prepareStatement(
+                    "DELETE FROM item_materials WHERE item_id = ?"
+            );
+            delete.setInt(1, itemId);
+            delete.executeUpdate();
+            delete.close();
+
+            // 새 재료 삽입
+            PreparedStatement insert = MySQLManager.getConnection().prepareStatement(
+                    "INSERT INTO item_materials (item_id, material_base64, amount) VALUES (?, ?, ?)"
+            );
+
+            for (ItemStack mat : materials) {
+                String matBase64 = ItemSerializer.serialize(mat);
+                insert.setInt(1, itemId);
+                insert.setString(2, matBase64);
+                insert.setInt(3, mat.getAmount());
+                insert.addBatch();
+            }
+
+            insert.executeBatch();
+            insert.close();
+            System.out.println("[ShopPlugin] 재료 저장 완료 (" + resultItem.getType() + ")");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
@@ -297,6 +364,8 @@ public class ShopManager implements Listener {
 
                 itemToMaterials.putIfAbsent(shopName, new HashMap<>());
                 itemToMaterials.get(shopName).put(resultItem, materials);
+
+                saveMaterialsForItem(shopName, resultItem, materials);
 
                 player.sendMessage("§a" + resultItem.getType() + "의 재료가 저장되었습니다.");
 
