@@ -427,15 +427,43 @@ public class ShopManager implements Listener {
             return;
         }
 
-        // [2] 일반 상점 GUI (편집 불가능한 상태)
-        // [거래 모드]
-        if (title.startsWith("§8[상점] ") && !currentEditingShop.containsKey(player.getUniqueId())) {
+        String shopName = null;
+        boolean isEditing = currentEditingShop.containsKey(player.getUniqueId());
+        if (isEditing) {
+            shopName = currentEditingShop.get(player.getUniqueId());
+        } else {
+            // 편집 중 아니면 shopName 추출 (일반 상점 열기 시)
+            if (title.startsWith("§8[상점] ")) {
+                shopName = title.substring("§8[상점] ".length());
+            }
+        }
+
+        // [2] 편집 모드인 경우
+        if (isEditing && shopName != null && title.startsWith("§8[상점] ")) {
+            String mode = editMode.getOrDefault(player.getUniqueId(), "edit");
+
+            if ("material".equals(mode)) {
+                if (e.getClick() == ClickType.RIGHT) {
+                    ItemStack clicked = e.getCurrentItem();
+                    if (clicked != null && clicked.getType() != Material.AIR) {
+                        selectedItem.put(player.getUniqueId(), clicked.clone());
+                        openMaterialGui(player, shopName, clicked.clone());
+                    }
+                }
+                e.setCancelled(true); // material 모드에선 왼클릭 등 차단
+            } else {
+                e.setCancelled(false); // edit 모드에선 자유 편집 허용
+            }
+            return; // 편집 모드이면 아래 거래 모드 진입 방지
+        }
+
+        // [3] 거래 모드 (일반 상점 열기)
+        if (!isEditing && shopName != null && title.startsWith("§8[상점] ")) {
             e.setCancelled(true); // 클릭 막고 수동 처리
 
             ItemStack clicked = e.getCurrentItem();
             if (clicked == null || clicked.getType() == Material.AIR) return;
 
-            String shopName = title.replace("§8[상점] ", "");
             Map<ItemStack, List<ItemStack>> materialMap = itemToMaterials.get(shopName);
             Map<ItemStack, Integer> stockMap = itemToStock.get(shopName);
 
@@ -444,7 +472,7 @@ public class ShopManager implements Listener {
                 return;
             }
 
-            // 해당 아이템의 재료 찾기
+            // 재료 찾기
             List<ItemStack> required = null;
             for (ItemStack key : materialMap.keySet()) {
                 if (key.isSimilar(clicked)) {
@@ -475,7 +503,7 @@ public class ShopManager implements Listener {
             // 재고 확인
             if (stockMap != null && stockMap.containsKey(clicked)) {
                 String key = player.getUniqueId().toString() + ":" + clicked.getType();
-                int used = PlayerTradeTracker.getCount(key); // ✅ 아래에 별도 구현
+                int used = PlayerTradeTracker.getCount(key);
                 int max = stockMap.get(clicked);
 
                 if (used >= max) {
@@ -486,41 +514,17 @@ public class ShopManager implements Listener {
                 PlayerTradeTracker.increment(key);
             }
 
-            // 재료 차감
+            // 재료 차감 및 아이템 지급
             for (ItemStack req : required) {
                 player.getInventory().removeItem(new ItemStack(req.getType(), req.getAmount()));
             }
 
-            // 아이템 지급
             player.getInventory().addItem(clicked.clone());
             player.sendMessage("§a아이템이 성공적으로 교환되었습니다!");
-        }
-
-
-        // [3] 상점 GUI - 편집 모드
-        if (title.startsWith("§8[상점] ") && currentEditingShop.containsKey(player.getUniqueId())) {
-            String mode = editMode.getOrDefault(player.getUniqueId(), "edit");
-
-            if (mode.equals("material")) {
-                if (e.getClick() == ClickType.RIGHT) {
-                    ItemStack clicked = e.getCurrentItem();
-                    if (clicked != null && clicked.getType() != Material.AIR) {
-                        String shopName = currentEditingShop.get(player.getUniqueId());
-                        selectedItem.put(player.getUniqueId(), clicked.clone());
-                        openMaterialGui(player, shopName, clicked.clone());
-                        e.setCancelled(true);
-                    }
-                } else {
-                    e.setCancelled(true); // material 모드에서 왼클릭 등은 차단
-                }
-            } else {
-                e.setCancelled(false); // edit 모드는 자유 편집 허용
-            }
-
             return;
         }
 
-        // [4] 재고 설정 GUI
+        // [4] 재고 설정 GUI 처리 (기존 그대로)
         if (title.startsWith("§b[재고 설정] ") && stockEditingShop.containsKey(player.getUniqueId())) {
             e.setCancelled(true);
             ItemStack clicked = e.getCurrentItem();
