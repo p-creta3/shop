@@ -7,17 +7,15 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class MySQLManager {
-    private static Connection connection;
 
-    public static void connect() {
-        String host = "localhost";
-        String database = "shop_db";
-        String user = "root";
-        String password = "1234";
-        String url = "jdbc:mysql://" + host + "/" + database + "?useSSL=false&characterEncoding=UTF-8";
+    private static final String HOST = "localhost";
+    private static final String DATABASE = "shop_db";
+    private static final String USER = "root";
+    private static final String PASSWORD = "1234";
+    private static final String URL = "jdbc:mysql://" + HOST + "/" + DATABASE + "?useSSL=false&characterEncoding=UTF-8";
 
-        try {
-            connection = DriverManager.getConnection(url, user, password);
+    public static void testConnection() {
+        try (Connection conn = getConnection()) {
             Bukkit.getLogger().info("[Shop] MySQL 연결 성공!");
         } catch (SQLException e) {
             e.printStackTrace();
@@ -25,16 +23,7 @@ public class MySQLManager {
         }
     }
 
-    public static Connection getConnection() {
-        return connection;
-    }
-
-    public static void close() {
-        try {
-            if (connection != null && !connection.isClosed()) connection.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 }
-

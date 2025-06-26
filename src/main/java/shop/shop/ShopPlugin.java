@@ -4,6 +4,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Bukkit;
 
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -14,7 +15,7 @@ public final class ShopPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
 
-        MySQLManager.connect();
+        MySQLManager.testConnection();
 
         loadShopsFromDatabase();
 
@@ -29,9 +30,9 @@ public final class ShopPlugin extends JavaPlugin {
     }
 
     public static void loadShopsFromDatabase() {
-        try {
-            Statement st = MySQLManager.getConnection().createStatement();
-            ResultSet rs = st.executeQuery("SELECT * FROM shops");
+        try (Connection conn = MySQLManager.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM shops")) {
 
             while (rs.next()) {
                 String name = rs.getString("name");
@@ -40,11 +41,9 @@ public final class ShopPlugin extends JavaPlugin {
                 Inventory inv = Bukkit.createInventory(null, rows * 9, "§8[상점] " + name);
                 shops.put(name, inv);
 
-                ShopManager.loadShopItems(name, inv);
+                ShopManager.loadShopItems(name, inv); // 내부에서도 커넥션 새로 만들게 해야 함
             }
 
-            rs.close();
-            st.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
