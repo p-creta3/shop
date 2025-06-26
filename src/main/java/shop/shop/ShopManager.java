@@ -82,6 +82,30 @@ public class ShopManager implements Listener {
         String name = args[1];
         if (shops.remove(name) != null) {
             player.sendMessage("§a상점 [" + name + "] 제거됨");
+
+            // MySQL에서도 상점과 관련된 데이터 삭제
+            try {
+                // shops 테이블에서 삭제
+                PreparedStatement psShop = MySQLManager.getConnection().prepareStatement(
+                        "DELETE FROM shops WHERE name = ?"
+                );
+                psShop.setString(1, name);
+                psShop.executeUpdate();
+                psShop.close();
+
+                // shop_items 테이블에서 관련 아이템 삭제
+                PreparedStatement psItems = MySQLManager.getConnection().prepareStatement(
+                        "DELETE FROM shop_items WHERE shop_name = ?"
+                );
+                psItems.setString(1, name);
+                psItems.executeUpdate();
+                psItems.close();
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                player.sendMessage("§cMySQL에서 상점 데이터를 삭제하는 도중 오류가 발생했습니다.");
+            }
+
         } else {
             player.sendMessage("§c존재하지 않는 상점입니다.");
         }
