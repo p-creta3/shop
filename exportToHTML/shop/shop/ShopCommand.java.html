@@ -1,0 +1,61 @@
+<html>
+<head>
+<title>ShopCommand.java</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cf8e6d;}
+.s1 { color: #bcbec4;}
+.s2 { color: #bcbec4;}
+.s3 { color: #6aab73;}
+.s4 { color: #2aacb8;}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+ShopCommand.java</font>
+</center></td></tr></table>
+<pre><span class="s0">package </span><span class="s1">shop</span><span class="s2">.</span><span class="s1">shop</span><span class="s2">;</span>
+
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">bukkit</span><span class="s2">.</span><span class="s1">command</span><span class="s2">.</span><span class="s1">Command</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">bukkit</span><span class="s2">.</span><span class="s1">command</span><span class="s2">.</span><span class="s1">CommandExecutor</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">bukkit</span><span class="s2">.</span><span class="s1">command</span><span class="s2">.</span><span class="s1">CommandSender</span><span class="s2">;</span>
+<span class="s0">import </span><span class="s1">org</span><span class="s2">.</span><span class="s1">bukkit</span><span class="s2">.</span><span class="s1">entity</span><span class="s2">.</span><span class="s1">Player</span><span class="s2">;</span>
+
+<span class="s0">public class </span><span class="s1">ShopCommand </span><span class="s0">implements </span><span class="s1">CommandExecutor </span><span class="s2">{</span>
+    <span class="s1">@Override</span>
+    <span class="s0">public boolean </span><span class="s1">onCommand</span><span class="s2">(</span><span class="s1">CommandSender sender</span><span class="s2">, </span><span class="s1">Command command</span><span class="s2">, </span><span class="s1">String label</span><span class="s2">, </span><span class="s1">String</span><span class="s2">[] </span><span class="s1">args</span><span class="s2">) {</span>
+        <span class="s0">if </span><span class="s2">(!(</span><span class="s1">sender </span><span class="s0">instanceof </span><span class="s1">Player player</span><span class="s2">)) {</span>
+            <span class="s1">sender</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;플레이어만 사용할 수 있습니다.&quot;</span><span class="s2">);</span>
+            <span class="s0">return true</span><span class="s2">;</span>
+        <span class="s2">}</span>
+
+        <span class="s0">if </span><span class="s2">(</span><span class="s1">args</span><span class="s2">.</span><span class="s1">length </span><span class="s2">== </span><span class="s4">0</span><span class="s2">) {</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§6[교환상점 명령어 목록]&quot;</span><span class="s2">);</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§e/교환상점 생성 §f[이름] [줄수]&quot;</span><span class="s2">);</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§e/교환상점 제거 §f[이름]&quot;</span><span class="s2">);</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§e/교환상점 열기 §f[이름]&quot;</span><span class="s2">);</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§e/교환상점 목록&quot;</span><span class="s2">);</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§e/교환상점 설정 §f[이름]&quot;</span><span class="s2">);</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§e/교환상점 재료 §f[이름]&quot;</span><span class="s2">);</span>
+            <span class="s1">player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§e/교환상점 재고 §f[이름] [줄수]&quot;</span><span class="s2">);</span>
+            <span class="s0">return true</span><span class="s2">;</span>
+        <span class="s2">}</span>
+
+        <span class="s0">switch </span><span class="s2">(</span><span class="s1">args</span><span class="s2">[</span><span class="s4">0</span><span class="s2">].</span><span class="s1">toLowerCase</span><span class="s2">()) {</span>
+            <span class="s0">case </span><span class="s3">&quot;생성&quot; </span><span class="s1">-&gt; ShopManager</span><span class="s2">.</span><span class="s1">createShop</span><span class="s2">(</span><span class="s1">player</span><span class="s2">, </span><span class="s1">args</span><span class="s2">);</span>
+            <span class="s0">case </span><span class="s3">&quot;제거&quot; </span><span class="s1">-&gt; ShopManager</span><span class="s2">.</span><span class="s1">removeShop</span><span class="s2">(</span><span class="s1">player</span><span class="s2">, </span><span class="s1">args</span><span class="s2">);</span>
+            <span class="s0">case </span><span class="s3">&quot;열기&quot; </span><span class="s1">-&gt; ShopManager</span><span class="s2">.</span><span class="s1">openShop</span><span class="s2">(</span><span class="s1">player</span><span class="s2">, </span><span class="s1">args</span><span class="s2">);</span>
+            <span class="s0">case </span><span class="s3">&quot;목록&quot; </span><span class="s1">-&gt; ShopManager</span><span class="s2">.</span><span class="s1">listShops</span><span class="s2">(</span><span class="s1">player</span><span class="s2">);</span>
+            <span class="s0">case </span><span class="s3">&quot;설정&quot; </span><span class="s1">-&gt; ShopManager</span><span class="s2">.</span><span class="s1">editShop</span><span class="s2">(</span><span class="s1">player</span><span class="s2">, </span><span class="s1">args</span><span class="s2">);</span>
+            <span class="s0">case </span><span class="s3">&quot;재료&quot; </span><span class="s1">-&gt; ShopManager</span><span class="s2">.</span><span class="s1">setMaterials</span><span class="s2">(</span><span class="s1">player</span><span class="s2">, </span><span class="s1">args</span><span class="s2">);</span>
+            <span class="s0">case </span><span class="s3">&quot;재고&quot; </span><span class="s1">-&gt; ShopManager</span><span class="s2">.</span><span class="s1">setStock</span><span class="s2">(</span><span class="s1">player</span><span class="s2">, </span><span class="s1">args</span><span class="s2">);</span>
+            <span class="s0">default </span><span class="s1">-&gt; player</span><span class="s2">.</span><span class="s1">sendMessage</span><span class="s2">(</span><span class="s3">&quot;§c존재하지 않는 서브 명령어입니다.&quot;</span><span class="s2">);</span>
+        <span class="s2">}</span>
+        <span class="s0">return true</span><span class="s2">;</span>
+    <span class="s2">}</span>
+<span class="s2">}</span>
+</pre>
+</body>
+</html>
