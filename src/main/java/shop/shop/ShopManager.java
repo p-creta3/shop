@@ -397,11 +397,31 @@ public class ShopManager implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent e) {
+        Player player = (Player) e.getPlayer();
         String title = e.getView().getTitle();
-        if (title.startsWith("§e[재료 설정] ")) {
-            // 저장 버튼으로만 저장되도록 하기 때문에 여기선 아무 것도 하지 않음
+
+        if (title.startsWith("§8[상점] ")) {
+            String shopName = title.replace("§8[상점] ", "");
+            Inventory inv = e.getInventory();
+
+            // 메모리 shops 업데이트
+            ShopManager.shops.put(shopName, inv);
+
+            // DB에 아이템 저장
+            for (ItemStack item : inv.getContents()) {
+                if (item != null && item.getType() != Material.AIR) {
+                    // 재고는 있으면 가져오고 없으면 null로 넘김
+                    Integer stock = null;
+                    if (ShopManager.itemToStock.containsKey(shopName)) {
+                        stock = ShopManager.itemToStock.get(shopName).get(item);
+                    }
+
+                    ShopManager.saveShopItem(shopName, item, stock);
+                }
+            }
         }
     }
+
 
     @EventHandler
     public void onChatStockInput(AsyncPlayerChatEvent e) {
