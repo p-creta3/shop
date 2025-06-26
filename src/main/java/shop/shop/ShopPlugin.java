@@ -13,10 +13,14 @@ import static shop.shop.ShopManager.shops;
 public final class ShopPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
+
+        MySQLManager.connect();
+
+        loadShopsFromDatabase();
+
         getCommand("교환상점").setExecutor(new ShopCommand());
         Bukkit.getPluginManager().registerEvents(new ShopManager(), this);
         getLogger().info("[교환상점] 플러그인이 활성화되었습니다.");
-        loadShopsFromDatabase();
     }
 
     @Override
