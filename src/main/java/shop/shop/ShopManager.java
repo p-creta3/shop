@@ -172,6 +172,8 @@ public class ShopManager implements Listener {
             insertStmt.executeUpdate();
             insertStmt.close();
 
+            System.out.println("[ShopPlugin] 상점 '" + shopName + "' 아이템 " + item.getType() + " 저장 완료, 재고: " + (stock != null ? stock : "null"));
+
         } catch (SQLException e) {
             e.printStackTrace();
             // 필요시 플레이어에게 메시지 전달 가능
@@ -397,7 +399,6 @@ public class ShopManager implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent e) {
-        Player player = (Player) e.getPlayer();
         String title = e.getView().getTitle();
 
         if (title.startsWith("§8[상점] ")) {
@@ -410,10 +411,15 @@ public class ShopManager implements Listener {
             // DB에 아이템 저장
             for (ItemStack item : inv.getContents()) {
                 if (item != null && item.getType() != Material.AIR) {
-                    // 재고는 있으면 가져오고 없으면 null로 넘김
                     Integer stock = null;
                     if (ShopManager.itemToStock.containsKey(shopName)) {
-                        stock = ShopManager.itemToStock.get(shopName).get(item);
+                        Map<ItemStack, Integer> stockMap = ShopManager.itemToStock.get(shopName);
+                        for (ItemStack keyItem : stockMap.keySet()) {
+                            if (keyItem.isSimilar(item)) {
+                                stock = stockMap.get(keyItem);
+                                break;
+                            }
+                        }
                     }
 
                     ShopManager.saveShopItem(shopName, item, stock);
@@ -421,7 +427,6 @@ public class ShopManager implements Listener {
             }
         }
     }
-
 
     @EventHandler
     public void onChatStockInput(AsyncPlayerChatEvent e) {
