@@ -2,6 +2,7 @@ name: shop
 version: 1.0
 main: shop.shop.ShopPlugin
 api-version: 1.21
+depend: [FancyNpcs]
 commands:
   교환상점:
     description: 교환 상점을 관리합니다

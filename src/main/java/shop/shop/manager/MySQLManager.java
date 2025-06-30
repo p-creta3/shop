@@ -1,4 +1,4 @@
-package shop.shop;
+package shop.shop.manager;
 
 import org.bukkit.Bukkit;
 
