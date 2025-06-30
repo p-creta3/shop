@@ -3,17 +3,31 @@ package shop.shop;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Bukkit;
+import shop.shop.command.ShopCommand;
+import shop.shop.listener.NpcClickListener;
+import shop.shop.listener.NpcCreateListener;
+import shop.shop.manager.MySQLManager;
+import shop.shop.manager.ShopManager;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import static shop.shop.ShopManager.shops;
+import static shop.shop.manager.ShopManager.shops;
 
 public final class ShopPlugin extends JavaPlugin {
+
+    private static ShopPlugin instance;
+
     @Override
     public void onEnable() {
+
+        instance = this;
+
+        getServer().getPluginManager().registerEvents(new NpcClickListener(), this);
+        getServer().getPluginManager().registerEvents(new NpcCreateListener(), this);
+        getServer().getPluginManager().registerEvents(new ShopManager(), this);
 
         MySQLManager.testConnection();
 
@@ -47,5 +61,9 @@ public final class ShopPlugin extends JavaPlugin {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    public static ShopPlugin getInstance() {
+        return instance;
     }
 }

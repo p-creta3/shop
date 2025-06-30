@@ -1,9 +1,10 @@
-package shop.shop;
+package shop.shop.command;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import shop.shop.manager.ShopManager;
 
 public class ShopCommand implements CommandExecutor {
     @Override

@@ -16,11 +16,15 @@ repositories {
         name = "sonatype"
         url = "https://oss.sonatype.org/content/groups/public/"
     }
+    flatDir {
+        dirs 'libs'
+    }
 }
 
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.21.4-R0.1-SNAPSHOT")
     implementation 'mysql:mysql-connector-java:8.0.33'
+    compileOnly name: 'FancyNpcs-2.5.2' // FancyNpcs.jar
 }
 
 tasks {
