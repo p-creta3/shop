@@ -1,8 +1,12 @@
 package shop.shop;
 
+import de.oliver.fancynpcs.api.FancyNpcsPlugin;
+import de.oliver.fancynpcs.api.Npc;
+
+import org.bukkit.Bukkit;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.Bukkit;
+
 import shop.shop.command.ShopCommand;
 import shop.shop.listener.NpcClickListener;
 import shop.shop.listener.NpcCreateListener;
@@ -15,6 +19,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import static shop.shop.manager.ShopManager.shops;
+import static shop.shop.registry.ShopNpcRegistry.*;
 
 public final class ShopPlugin extends JavaPlugin {
 
@@ -31,10 +36,12 @@ public final class ShopPlugin extends JavaPlugin {
 
         MySQLManager.testConnection();
 
+        reloadMappings();
+
         loadShopsFromDatabase();
 
         getCommand("교환상점").setExecutor(new ShopCommand());
-        Bukkit.getPluginManager().registerEvents(new ShopManager(), this);
+
         getLogger().info("[교환상점] 플러그인이 활성화되었습니다.");
     }
 
@@ -62,6 +69,44 @@ public final class ShopPlugin extends JavaPlugin {
             e.printStackTrace();
         }
     }
+
+    public static void reloadMappings() {
+        getNpcToShop().clear();  // 직접 Map 접근 가능
+        for (Npc npc : FancyNpcsPlugin.get().getNpcManager().getAllNpcs()) {
+            String id = npc.getData().getId();
+            String name = npc.getData().getDisplayName();
+            String shopName = parseShopName(name);
+
+            if (shopName != null && !shopName.isEmpty()) {
+                register(id, shopName);
+                Bukkit.getLogger().info("[ShopPlugin] NPC '" + name + "' -> 상점 '" + shopName + "' 자동 매핑");
+            } else {
+                Bukkit.getLogger().warning("[ShopPlugin] NPC '" + name + "'에서 상점 이름 추출 실패");
+            }
+        }
+    }
+
+    private static String parseShopName(String displayName) {
+        // 예: "[shop]weapon_shop" → "weapon_shop"
+        if (displayName.startsWith("[shop]")) {
+            return displayName.substring(6);
+        }
+
+        // 예: "무기상점" → 그대로 사용
+        if (displayName.matches("^[a-zA-Z0-9_가-힣]+$")) {
+            return displayName;
+        }
+
+        // 예: "상점:armor_shop" → ":" 뒤 부분 추출
+        if (displayName.contains(":")) {
+            return displayName.split(":")[1];
+        }
+
+        // 기타 상황: null 반환
+        return null;
+    }
+
+
 
     public static ShopPlugin getInstance() {
         return instance;

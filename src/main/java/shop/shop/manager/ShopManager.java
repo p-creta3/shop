@@ -314,9 +314,9 @@ public class ShopManager implements Listener {
         int maxStock;
         try {
             maxStock = Integer.parseInt(args[2]);
-            if (maxStock <= 0) throw new NumberFormatException();
+            if (maxStock < 0) throw new NumberFormatException(); // 0 이상은 허용
         } catch (NumberFormatException e) {
-            player.sendMessage("§c횟수는 1 이상의 숫자여야 합니다.");
+            player.sendMessage("§c횟수는 0 이상의 숫자여야 합니다. (0 = 무제한)");
             return;
         }
 
@@ -329,12 +329,16 @@ public class ShopManager implements Listener {
         Map<ItemStack, Integer> stockMap = new HashMap<>();
         for (ItemStack item : inv.getContents()) {
             if (item != null && item.getType() != Material.AIR) {
-                stockMap.put(item.clone(), maxStock);
+                stockMap.put(item.clone(), maxStock == 0 ? null : maxStock); // 0이면 null 저장 = 무제한
             }
         }
 
         itemToStock.put(name, stockMap);
-        player.sendMessage("§a[" + name + "] 상점 내 아이템들의 최대 교환 횟수를 " + maxStock + "회로 설정했습니다.");
+        if (maxStock == 0) {
+            player.sendMessage("§a[" + name + "] 상점 내 아이템들의 최대 교환 횟수를 §e무제한§a으로 설정했습니다.");
+        } else {
+            player.sendMessage("§a[" + name + "] 상점 내 아이템들의 최대 교환 횟수를 " + maxStock + "회로 설정했습니다.");
+        }
     }
 
     public static void saveMaterialsForItem(String shopName, ItemStack resultItem, List<ItemStack> materials) {
@@ -505,15 +509,15 @@ public class ShopManager implements Listener {
             // 재고 확인
             if (stockMap != null && stockMap.containsKey(clicked)) {
                 String key = player.getUniqueId().toString() + ":" + clicked.getType();
-                int used = PlayerTradeTracker.getCount(key);
-                int max = stockMap.get(clicked);
-
-                if (used >= max) {
-                    player.sendMessage("§c이 아이템은 더 이상 교환할 수 없습니다.");
-                    return;
+                Integer max = stockMap.get(clicked);
+                if (max != null) {
+                    int used = PlayerTradeTracker.getCount(key);
+                    if (used >= max) {
+                        player.sendMessage("§c이 아이템은 더 이상 교환할 수 없습니다.");
+                        return;
+                    }
+                    PlayerTradeTracker.increment(key);
                 }
-
-                PlayerTradeTracker.increment(key);
             }
 
             // 재료 차감 및 아이템 지급
