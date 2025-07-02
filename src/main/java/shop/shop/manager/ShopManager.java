@@ -217,7 +217,7 @@ public class ShopManager implements Listener {
             while (rs.next()) {
                 int itemId = rs.getInt("id");
                 String base64 = rs.getString("item_base64");
-                int stock = rs.getInt("stock");
+                Integer stock = rs.wasNull() ? null : rs.getInt("stock");
 
                 ItemStack item = ItemSerializer.deserialize(base64);
                 if (item != null) {
@@ -226,6 +226,7 @@ public class ShopManager implements Listener {
                     // 재고 등록
                     itemToStock.putIfAbsent(shopName, new HashMap<>());
                     itemToStock.get(shopName).put(item, stock);
+                    System.out.println("[ShopPlugin] 상점 '" + shopName + "' 아이템 " + item.getType() + " 로드, 재고: " + (stock == null ? "무제한" : stock));
 
                     // 재료 불러오기
                     loadMaterialsForItem(itemId, item, shopName);
@@ -330,6 +331,14 @@ public class ShopManager implements Listener {
         for (ItemStack item : inv.getContents()) {
             if (item != null && item.getType() != Material.AIR) {
                 stockMap.put(item.clone(), maxStock == 0 ? null : maxStock); // 0이면 null 저장 = 무제한
+                // 데이터베이스에 재고 저장
+                saveShopItem(name, item.clone(), maxStock == 0 ? null : maxStock);
+
+                if (maxStock == 0) {
+                    String key = player.getUniqueId().toString() + ":" + item.getType();
+                    PlayerTradeTracker.reset(key);
+                    System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "의 " + item.getType() + " 교환 기록 초기화");
+                }
             }
         }
 
@@ -338,6 +347,207 @@ public class ShopManager implements Listener {
             player.sendMessage("§a[" + name + "] 상점 내 아이템들의 최대 교환 횟수를 §e무제한§a으로 설정했습니다.");
         } else {
             player.sendMessage("§a[" + name + "] 상점 내 아이템들의 최대 교환 횟수를 " + maxStock + "회로 설정했습니다.");
+        }
+        System.out.println("[ShopPlugin] 상점 '" + name + "' 재고 설정: " + (maxStock == 0 ? "무제한" : maxStock));
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent e) {
+        Player player = (Player) e.getWhoClicked();
+        Inventory clickedInv = e.getClickedInventory();
+        if (clickedInv == null || e.getCurrentItem() == null) return;
+
+        String title = e.getView().getTitle();
+        int slot = e.getRawSlot();
+
+        // [1] 재료 설정 GUI 처리
+        if (title.startsWith("§e[재료 설정] ")) {
+            if (slot == 26) {
+                e.setCancelled(true);
+
+                String shopName = currentEditingShop.get(player.getUniqueId());
+                ItemStack resultItem = selectedItem.get(player.getUniqueId());
+
+                if (shopName == null || resultItem == null) {
+                    player.sendMessage("§c저장할 수 없습니다. (정보 누락)");
+                    player.closeInventory();
+                    return;
+                }
+
+                List<ItemStack> materials = new ArrayList<>();
+                Inventory inv = e.getInventory();
+                for (int i = 0; i < 26; i++) {
+                    ItemStack is = inv.getItem(i);
+                    if (is != null && is.getType() != Material.AIR) {
+                        materials.add(is.clone());
+                    }
+                }
+
+                itemToMaterials.putIfAbsent(shopName, new HashMap<>());
+                itemToMaterials.get(shopName).put(resultItem, materials);
+
+                saveMaterialsForItem(shopName, resultItem, materials);
+
+                player.sendMessage("§a" + resultItem.getType() + "의 재료가 저장되었습니다.");
+
+                // 상태 초기화
+                currentEditingShop.remove(player.getUniqueId());
+                selectedItem.remove(player.getUniqueId());
+                editMode.remove(player.getUniqueId());
+
+                player.closeInventory();
+            } else if (slot >= 0 && slot < 26) {
+                e.setCancelled(false); // 재료 입력 허용
+            } else {
+                e.setCancelled(true); // 플레이어 인벤토리 클릭 차단
+                System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 재료 설정 GUI에서 플레이어 인벤토리 클릭 차단");
+            }
+
+            return;
+        }
+
+        String shopName = null;
+        boolean isEditing = currentEditingShop.containsKey(player.getUniqueId());
+        if (isEditing) {
+            shopName = currentEditingShop.get(player.getUniqueId());
+        } else {
+            if (title.startsWith("§8[상점] ")) {
+                shopName = title.substring("§8[상점] ".length());
+            }
+        }
+
+        // [2] 편집 모드인 경우
+        if (isEditing && shopName != null && title.startsWith("§8[상점] ")) {
+            Inventory shopInv = shops.get(shopName);
+            String mode = editMode.getOrDefault(player.getUniqueId(), "edit");
+
+            if ("material".equals(mode)) {
+                if (e.getClick() == ClickType.RIGHT && clickedInv == shopInv && slot < shopInv.getSize()) {
+                    ItemStack clicked = e.getCurrentItem();
+                    if (clicked != null && clicked.getType() != Material.AIR) {
+                        selectedItem.put(player.getUniqueId(), clicked.clone());
+                        openMaterialGui(player, shopName, clicked.clone());
+                    }
+                }
+                e.setCancelled(true); // material 모드에선 모든 클릭 차단 (우클릭은 위에서 처리)
+                System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 material 모드에서 클릭 (차단됨)");
+            } else {
+                // edit 모드: 상점 인벤토리만 편집 허용
+                if (clickedInv != shopInv || slot >= shopInv.getSize()) {
+                    e.setCancelled(true); // 플레이어 인벤토리 클릭 차단
+                    System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 edit 모드에서 플레이어 인벤토리 클릭 차단");
+                } else {
+                    e.setCancelled(false); // 상점 인벤토리 편집 허용
+                    System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 edit 모드에서 상점 인벤토리 편집");
+                }
+            }
+            return;
+        }
+
+        // [3] 거래 모드 (일반 상점 열기)
+        if (!isEditing && shopName != null && title.startsWith("§8[상점] ")) {
+            Inventory shopInv = shops.get(shopName);
+            if (clickedInv != shopInv || slot >= shopInv.getSize()) {
+                e.setCancelled(true); // 플레이어 인벤토리 클릭 차단
+                System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 상점 '" + shopName + "' 외부 클릭 (플레이어 인벤토리 또는 잘못된 슬롯)");
+                return;
+            }
+
+            e.setCancelled(true); // 클릭 막고 수동 처리
+
+            ItemStack clicked = e.getCurrentItem();
+            if (clicked == null || clicked.getType() == Material.AIR) return;
+
+            Map<ItemStack, List<ItemStack>> materialMap = itemToMaterials.get(shopName);
+            Map<ItemStack, Integer> stockMap = itemToStock.get(shopName);
+
+            if (materialMap == null) {
+                player.sendMessage("§c이 아이템은 설정된 재료가 없습니다.");
+                System.out.println("[ShopPlugin] 상점 '" + shopName + "'에 재료 맵 없음");
+                return;
+            }
+
+            // 재료 찾기
+            List<ItemStack> required = null;
+            for (ItemStack key : materialMap.keySet()) {
+                if (key.isSimilar(clicked)) {
+                    required = materialMap.get(key);
+                    break;
+                }
+            }
+
+            if (required == null) {
+                player.sendMessage("§c이 아이템은 교환 재료가 없습니다.");
+                System.out.println("[ShopPlugin] 상점 '" + shopName + "'에서 아이템 " + clicked.getType() + "에 대한 재료 없음");
+                return;
+            }
+
+            // 재료 충분한지 확인
+            boolean hasAll = true;
+            for (ItemStack req : required) {
+                if (!player.getInventory().containsAtLeast(req, req.getAmount())) {
+                    hasAll = false;
+                    break;
+                }
+            }
+
+            if (!hasAll) {
+                player.sendMessage("§c재료가 부족합니다.");
+                System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 재료 부족으로 " + clicked.getType() + " 교환 실패");
+                return;
+            }
+
+            // 재고 확인
+            if (stockMap != null) {
+                ItemStack matchedItem = null;
+                Integer max = null;
+                for (Map.Entry<ItemStack, Integer> entry : stockMap.entrySet()) {
+                    if (entry.getKey().isSimilar(clicked)) {
+                        matchedItem = entry.getKey();
+                        max = entry.getValue();
+                        break;
+                    }
+                }
+
+                if (matchedItem != null && max != null && max > 0) { // 재고 제한이 있는 경우
+                    String key = player.getUniqueId().toString() + ":" + clicked.getType();
+                    int used = PlayerTradeTracker.getCount(key);
+                    System.out.println("[ShopPlugin] PlayerTradeTracker count for " + key + ": " + used);
+                    if (used >= max) {
+                        player.sendMessage("§c이 아이템은 더 이상 교환할 수 없습니다.");
+                        System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 " + clicked.getType() + " 재고 초과로 교환 실패");
+                        return;
+                    }
+                    PlayerTradeTracker.increment(key);
+                    System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 " + clicked.getType() + " 교환 (현재: " + (used + 1) + "/" + max + ")");
+                } else if (matchedItem != null) { // max == null, 즉 무제한
+                    System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 " + clicked.getType() + " 교환 (무제한)");
+                } else {
+                    System.out.println("[ShopPlugin] 상점 '" + shopName + "'에서 아이템 " + clicked.getType() + "에 대한 재고 정보 없음");
+                }
+            }
+
+            // 재료 차감 및 아이템 지급
+            for (ItemStack req : required) {
+                player.getInventory().removeItem(new ItemStack(req.getType(), req.getAmount()));
+            }
+
+            player.getInventory().addItem(clicked.clone());
+            player.sendMessage("§a아이템이 성공적으로 교환되었습니다!");
+            System.out.println("[ShopPlugin] 플레이어 " + player.getName() + "가 " + clicked.getType() + " 교환 성공");
+            return;
+        }
+
+        // [4] 재고 설정 GUI 처리
+        if (title.startsWith("§b[재고 설정] ") && stockEditingShop.containsKey(player.getUniqueId())) {
+            e.setCancelled(true);
+            ItemStack clicked = e.getCurrentItem();
+            if (clicked != null && clicked.getType() != Material.AIR) {
+                player.closeInventory();
+                selectedItem.put(player.getUniqueId(), clicked);
+                waitingForStockInput.add(player.getUniqueId());
+                player.sendMessage("§a해당 아이템의 최대 재고 수량을 채팅으로 입력하세요.");
+            }
         }
     }
 
@@ -375,171 +585,6 @@ public class ShopManager implements Listener {
             System.out.println("[ShopPlugin] 재료 저장 완료 (" + resultItem.getType() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
-        }
-    }
-
-
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent e) {
-        Player player = (Player) e.getWhoClicked();
-        Inventory clickedInv = e.getClickedInventory();
-        if (clickedInv == null || e.getCurrentItem() == null) return;
-
-        String title = e.getView().getTitle();
-        int slot = e.getRawSlot(); // 현재 열린 GUI 기준 슬롯 번호 (0~35)
-
-        // [1] 재료 설정 GUI 처리
-        if (title.startsWith("§e[재료 설정] ")) {
-            if (slot == 26) {
-                e.setCancelled(true);
-
-                String shopName = currentEditingShop.get(player.getUniqueId());
-                ItemStack resultItem = selectedItem.get(player.getUniqueId());
-
-                if (shopName == null || resultItem == null) {
-                    player.sendMessage("§c저장할 수 없습니다. (정보 누락)");
-                    player.closeInventory();
-                    return;
-                }
-
-                List<ItemStack> materials = new ArrayList<>();
-                Inventory inv = e.getInventory(); // 현재 GUI 인벤토리 (0~26)
-                for (int i = 0; i < 26; i++) {
-                    ItemStack is = inv.getItem(i);
-                    if (is != null && is.getType() != Material.AIR) {
-                        materials.add(is.clone());
-                    }
-                }
-
-                itemToMaterials.putIfAbsent(shopName, new HashMap<>());
-                itemToMaterials.get(shopName).put(resultItem, materials);
-
-                saveMaterialsForItem(shopName, resultItem, materials);
-
-                player.sendMessage("§a" + resultItem.getType() + "의 재료가 저장되었습니다.");
-
-                // 상태 초기화
-                currentEditingShop.remove(player.getUniqueId());
-                selectedItem.remove(player.getUniqueId());
-                editMode.remove(player.getUniqueId());
-
-                player.closeInventory();
-            } else if (slot >= 0 && slot < 26) {
-                e.setCancelled(false); // 재료 입력 허용
-            } else {
-                e.setCancelled(false); // 플레이어 인벤토리도 허용
-            }
-
-            return;
-        }
-
-        String shopName = null;
-        boolean isEditing = currentEditingShop.containsKey(player.getUniqueId());
-        if (isEditing) {
-            shopName = currentEditingShop.get(player.getUniqueId());
-        } else {
-            // 편집 중 아니면 shopName 추출 (일반 상점 열기 시)
-            if (title.startsWith("§8[상점] ")) {
-                shopName = title.substring("§8[상점] ".length());
-            }
-        }
-
-        // [2] 편집 모드인 경우
-        if (isEditing && shopName != null && title.startsWith("§8[상점] ")) {
-            String mode = editMode.getOrDefault(player.getUniqueId(), "edit");
-
-            if ("material".equals(mode)) {
-                if (e.getClick() == ClickType.RIGHT) {
-                    ItemStack clicked = e.getCurrentItem();
-                    if (clicked != null && clicked.getType() != Material.AIR) {
-                        selectedItem.put(player.getUniqueId(), clicked.clone());
-                        openMaterialGui(player, shopName, clicked.clone());
-                    }
-                }
-                e.setCancelled(true); // material 모드에선 왼클릭 등 차단
-            } else {
-                e.setCancelled(false); // edit 모드에선 자유 편집 허용
-            }
-            return; // 편집 모드이면 아래 거래 모드 진입 방지
-        }
-
-        // [3] 거래 모드 (일반 상점 열기)
-        if (!isEditing && shopName != null && title.startsWith("§8[상점] ")) {
-            e.setCancelled(true); // 클릭 막고 수동 처리
-
-            ItemStack clicked = e.getCurrentItem();
-            if (clicked == null || clicked.getType() == Material.AIR) return;
-
-            Map<ItemStack, List<ItemStack>> materialMap = itemToMaterials.get(shopName);
-            Map<ItemStack, Integer> stockMap = itemToStock.get(shopName);
-
-            if (materialMap == null) {
-                player.sendMessage("§c이 아이템은 설정된 재료가 없습니다.");
-                return;
-            }
-
-            // 재료 찾기
-            List<ItemStack> required = null;
-            for (ItemStack key : materialMap.keySet()) {
-                if (key.isSimilar(clicked)) {
-                    required = materialMap.get(key);
-                    break;
-                }
-            }
-
-            if (required == null) {
-                player.sendMessage("§c이 아이템은 교환 재료가 없습니다.");
-                return;
-            }
-
-            // 재료 충분한지 확인
-            boolean hasAll = true;
-            for (ItemStack req : required) {
-                if (!player.getInventory().containsAtLeast(req, req.getAmount())) {
-                    hasAll = false;
-                    break;
-                }
-            }
-
-            if (!hasAll) {
-                player.sendMessage("§c재료가 부족합니다.");
-                return;
-            }
-
-            // 재고 확인
-            if (stockMap != null && stockMap.containsKey(clicked)) {
-                String key = player.getUniqueId().toString() + ":" + clicked.getType();
-                Integer max = stockMap.get(clicked);
-                if (max != null) {
-                    int used = PlayerTradeTracker.getCount(key);
-                    if (used >= max) {
-                        player.sendMessage("§c이 아이템은 더 이상 교환할 수 없습니다.");
-                        return;
-                    }
-                    PlayerTradeTracker.increment(key);
-                }
-            }
-
-            // 재료 차감 및 아이템 지급
-            for (ItemStack req : required) {
-                player.getInventory().removeItem(new ItemStack(req.getType(), req.getAmount()));
-            }
-
-            player.getInventory().addItem(clicked.clone());
-            player.sendMessage("§a아이템이 성공적으로 교환되었습니다!");
-            return;
-        }
-
-        // [4] 재고 설정 GUI 처리 (기존 그대로)
-        if (title.startsWith("§b[재고 설정] ") && stockEditingShop.containsKey(player.getUniqueId())) {
-            e.setCancelled(true);
-            ItemStack clicked = e.getCurrentItem();
-            if (clicked != null && clicked.getType() != Material.AIR) {
-                player.closeInventory();
-                selectedItem.put(player.getUniqueId(), clicked.clone());
-                waitingForStockInput.add(player.getUniqueId());
-                player.sendMessage("§a해당 아이템의 최대 재고 수량을 채팅으로 입력하세요.");
-            }
         }
     }
 

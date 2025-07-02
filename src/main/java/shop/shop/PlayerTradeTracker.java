@@ -14,5 +14,8 @@ public class PlayerTradeTracker {
         tradeCounts.put(key, getCount(key) + 1);
     }
 
+    public static void reset(String key) {
+        tradeCounts.remove(key);
+    }
     // (Optional) 초기화, 저장 등 추가 가능
 }
